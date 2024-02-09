@@ -28,7 +28,6 @@ impl Todos {
     }
 
     fn print_todos(&self) {
-
         fn print_list(list: &Vec<String>) {
             for (i, text) in list.iter().enumerate() {
                 println!("  {}: {}", i, text)
@@ -43,6 +42,8 @@ impl Todos {
 
         println!("Done:");
         print_list(&self.done);
+
+        println!();
     }
 
     fn swap(&mut self, todo_type: TodoType, i: i32, j: i32) {
@@ -55,10 +56,22 @@ impl Todos {
         list.swap(i as usize, j as usize);
     }
 
-    fn move_to(&mut self, from_type: TodoType, to_type: TodoType) {
-        // TODO
-    }
+    fn move_to(&mut self, from_type: TodoType, to_type: TodoType, index: usize) {
+        let from_list: &mut Vec<String> = match from_type {
+            TodoType::Backlog => &mut self.backlog,
+            TodoType::InProgress => &mut self.in_progress,
+            TodoType::Done => &mut self.done,
+        };
+        let item = from_list.remove(index);
 
+        let to_list: &mut Vec<String> = match to_type {
+            TodoType::Backlog => &mut self.backlog,
+            TodoType::InProgress => &mut self.in_progress,
+            TodoType::Done => &mut self.done,
+        };
+
+        to_list.push(item);
+    }
 }
 
 fn main() {
@@ -69,8 +82,12 @@ fn main() {
     t.add_todo("kolmas", TodoType::Backlog);
     t.add_todo("heippa", TodoType::InProgress);
     t.add_todo("hola", TodoType::Done);
+
     t.print_todos();
-    println!("");
+
     t.swap(TodoType::Backlog, 0, 1);
+    t.print_todos();
+    
+    t.move_to(TodoType::InProgress, TodoType::Done, 0);
     t.print_todos();
 }
