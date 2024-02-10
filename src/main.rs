@@ -107,7 +107,7 @@ fn input_loop(
         bg: Some(Color::Black),
         ..Default::default()
     };
-    
+
     let task_default = Style {
         fg: Some(Color::White),
         bg: Some(Color::Black),
@@ -115,7 +115,7 @@ fn input_loop(
     };
 
     let task_selected = Style {
-        fg: Some(Color::White),F
+        fg: Some(Color::White),
         bg: Some(Color::DarkGray),
         ..Default::default()
     };
@@ -177,7 +177,11 @@ fn input_loop(
             // Render tasks
             for (i, item) in current_list.iter().enumerate() {
                 if i == current_index {
-                    paragraphs.push(Paragraph::new(item.clone()).style(if editing {task_editing} else {task_selected}));
+                    paragraphs.push(Paragraph::new(item.clone()).style(if editing {
+                        task_editing
+                    } else {
+                        task_selected
+                    }));
                 } else {
                     paragraphs.push(Paragraph::new(item.clone()).style(task_default));
                 }
