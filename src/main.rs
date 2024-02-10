@@ -1,3 +1,19 @@
+use crossterm::{
+    event::{self, KeyCode, KeyEventKind, KeyModifiers},
+    style::Color,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
+use ratatui::{
+    layout::Rect,
+    prelude::{CrosstermBackend, Stylize, Terminal},
+    style::{Modifier, Style},
+    text::{Line, Text},
+    widgets::Paragraph,
+};
+use std::io::{stdout, Result};
+use TodoType::{Backlog, Done, InProgress};
+
 enum TodoType {
     Backlog,
     InProgress,
@@ -46,7 +62,7 @@ impl Todos {
         println!();
     }
 
-    fn swap(&mut self, todo_type: TodoType, i: i32, j: i32) {
+    fn swap(&mut self, todo_type: &TodoType, i: i32, j: i32) {
         let list: &mut Vec<String> = match todo_type {
             TodoType::Backlog => &mut self.backlog,
             TodoType::InProgress => &mut self.in_progress,
@@ -62,7 +78,7 @@ impl Todos {
             TodoType::InProgress => &mut self.in_progress,
             TodoType::Done => &mut self.done,
         };
-        let item = from_list.remove(index);
+        let item: String = from_list.remove(index);
 
         let to_list: &mut Vec<String> = match to_type {
             TodoType::Backlog => &mut self.backlog,
@@ -74,20 +90,177 @@ impl Todos {
     }
 }
 
-fn main() {
-    let mut t = Todos::new();
+fn input_loop(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    todos: &mut Todos,
+) -> Result<()> {
+    let mut chosen_list: TodoType = TodoType::InProgress;
+    let mut current_index: usize = 0;
 
-    t.add_todo("eka", TodoType::Backlog);
-    t.add_todo("toka", TodoType::Backlog);
-    t.add_todo("kolmas", TodoType::Backlog);
-    t.add_todo("heippa", TodoType::InProgress);
-    t.add_todo("hola", TodoType::Done);
+    let selected_style = Style {
+        fg: Some(ratatui::style::Color::Cyan),
+        bg: Some(ratatui::style::Color::Black),
+        ..Default::default()
+    };
 
-    t.print_todos();
+    let default_style = Style {
+        fg: Some(ratatui::style::Color::White),
+        bg: Some(ratatui::style::Color::Black),
+        ..Default::default()
+    };
 
-    t.swap(TodoType::Backlog, 0, 1);
-    t.print_todos();
-    
-    t.move_to(TodoType::InProgress, TodoType::Done, 0);
-    t.print_todos();
+    loop {
+        let current_list: &Vec<String> = match chosen_list {
+            Backlog => &todos.backlog,
+            InProgress => &todos.in_progress,
+            Done => &todos.done,
+        };
+
+        if current_list.len() > 0 && current_list.len() < current_index + 1 {
+            current_index = current_list.len() - 1;
+        }
+
+        terminal.draw(|frame| {
+            let mut area = frame.size();
+            area.height = area.height / 2;
+
+            let mut paragraphs: Vec<Paragraph<'_>> = Vec::<Paragraph>::new();
+
+            let third_length = frame.size().width / 3;
+
+            frame.render_widget(
+                Paragraph::new("Backlog")
+                    .style(match chosen_list {
+                        Backlog => selected_style,
+                        _ => default_style,
+                    })
+                    .centered(),
+                Rect::new(0, 0, third_length, 1),
+            );
+            frame.render_widget(
+                Paragraph::new("In Progress")
+                    .style(match chosen_list {
+                        InProgress => selected_style,
+                        _ => default_style,
+                    })
+                    .centered(),
+                Rect::new(third_length, 0, third_length, 1),
+            );
+            frame.render_widget(
+                Paragraph::new("Done")
+                    .style(match chosen_list {
+                        Done => selected_style,
+                        _ => default_style,
+                    })
+                    .centered(),
+                Rect::new(third_length * 2, 0, third_length, 1),
+            );
+
+            // Render tasks
+            for (i, item) in current_list.iter().enumerate() {
+                if i == current_index {
+                    paragraphs.push(Paragraph::new(item.clone()).white().on_dark_gray());
+                } else {
+                    paragraphs.push(Paragraph::new(item.clone()).white().on_black());
+                }
+            }
+
+            for (i, item) in paragraphs.iter().enumerate() {
+                frame.render_widget(item, Rect::new(0, 1 + i as u16, frame.size().width, 1));
+            }
+        })?;
+
+        if event::poll(std::time::Duration::from_millis(16))? {
+            if let event::Event::Key(key) = event::read()? {
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
+                // Move task
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    if current_list.len() == 0 {
+                        continue;
+                    }
+                    match key.code {
+                        KeyCode::Right => match chosen_list {
+                            Backlog => todos.move_to(Backlog, InProgress, current_index),
+                            InProgress => todos.move_to(InProgress, Done, current_index),
+                            _ => (),
+                        },
+                        KeyCode::Left => match chosen_list {
+                            InProgress => todos.move_to(InProgress, Backlog, current_index),
+                            Done => todos.move_to(Done, InProgress, current_index),
+                            _ => (),
+                        },
+                        KeyCode::Up => {
+                            if current_index != 0 {
+                                todos.swap(&chosen_list, current_index as i32, current_index as i32 - 1);
+                                current_index -= 1;
+                            }
+                        }
+                        KeyCode::Down => {
+                            if current_index != current_list.len() - 1 {
+                                todos.swap(&chosen_list, current_index as i32, current_index as i32 + 1);
+                                current_index += 1;
+                            }
+                        }
+                        _ => (),
+                    }
+                } else {
+                    // Move cursor
+                    match key.code {
+                        KeyCode::Char('q') => {
+                            break;
+                        }
+                        KeyCode::Up => {
+                            if current_index > 0 {
+                                current_index -= 1;
+                            }
+                        }
+                        KeyCode::Down => {
+                            if current_index + 1 < current_list.len() {
+                                current_index += 1;
+                            }
+                        }
+                        KeyCode::Left => match chosen_list {
+                            InProgress => chosen_list = Backlog,
+                            Done => chosen_list = InProgress,
+                            _ => (),
+                        },
+                        KeyCode::Right => match chosen_list {
+                            InProgress => chosen_list = Done,
+                            Backlog => chosen_list = InProgress,
+                            _ => (),
+                        },
+                        _ => (),
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let mut t: Todos = Todos::new();
+
+    t.add_todo("eka", Backlog);
+    t.add_todo("toka", Backlog);
+    t.add_todo("kolmas", Backlog);
+    t.add_todo("Eka taski", InProgress);
+    t.add_todo("Toka taski", InProgress);
+    t.add_todo("Kolmas", InProgress);
+    t.add_todo("Neljäs", InProgress);
+    t.add_todo("Valmis :D", Done);
+
+    stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let mut terminal: Terminal<CrosstermBackend<std::io::Stdout>> =
+        Terminal::new(CrosstermBackend::new(stdout()))?;
+    terminal.clear()?;
+
+    input_loop(&mut terminal, &mut t)?;
+
+    stdout().execute(LeaveAlternateScreen)?;
+    disable_raw_mode()?;
+    Ok(())
 }
