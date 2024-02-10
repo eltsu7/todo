@@ -1,14 +1,12 @@
 use crossterm::{
     event::{self, KeyCode, KeyEventKind, KeyModifiers},
-    style::Color,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::{
     layout::Rect,
     prelude::{CrosstermBackend, Stylize, Terminal},
-    style::{Modifier, Style},
-    text::{Line, Text},
+    style::{Color, Style},
     widgets::Paragraph,
 };
 use std::io::{stdout, Result};
@@ -98,14 +96,14 @@ fn input_loop(
     let mut current_index: usize = 0;
 
     let selected_style = Style {
-        fg: Some(ratatui::style::Color::Cyan),
-        bg: Some(ratatui::style::Color::Black),
+        fg: Some(Color::Cyan),
+        bg: Some(Color::Black),
         ..Default::default()
     };
 
     let default_style = Style {
-        fg: Some(ratatui::style::Color::White),
-        bg: Some(ratatui::style::Color::Black),
+        fg: Some(Color::White),
+        bg: Some(Color::Black),
         ..Default::default()
     };
 
