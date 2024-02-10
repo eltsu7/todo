@@ -9,7 +9,10 @@ use ratatui::{
     style::{Color, Style},
     widgets::Paragraph,
 };
-use std::io::{stdout, Result};
+use std::{
+    cmp,
+    io::{stdout, Result},
+};
 use TodoType::{Backlog, Done, InProgress};
 
 enum TodoType {
@@ -244,6 +247,16 @@ fn input_loop(
                             } else {
                                 match key_char {
                                     'q' => break,
+                                    'i' => {
+                                        let insert_index = if current_list.len() > 0 {
+                                            current_index + 1
+                                        } else {
+                                            current_index
+                                        };
+                                        current_list.insert(insert_index, String::new());
+                                        current_index += 1;
+                                        editing = true;
+                                    }
                                     _ => (),
                                 }
                             }
@@ -253,7 +266,12 @@ fn input_loop(
                                 current_list[current_index].pop();
                             }
                         }
-                        KeyCode::Enter => editing = !editing,
+                        KeyCode::Enter => {
+                            editing = !editing;
+                            if current_list[current_index] == "" {
+                                current_list.remove(current_index);
+                            }
+                        }
                         KeyCode::Up => {
                             if current_index > 0 {
                                 current_index -= 1;
