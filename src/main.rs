@@ -128,6 +128,7 @@ fn input_loop(
 
             let third_length = frame.size().width / 3;
 
+            // Render titles
             frame.render_widget(
                 Paragraph::new("Backlog")
                     .style(match chosen_list {
@@ -193,13 +194,21 @@ fn input_loop(
                         },
                         KeyCode::Up => {
                             if current_index != 0 {
-                                todos.swap(&chosen_list, current_index as i32, current_index as i32 - 1);
+                                todos.swap(
+                                    &chosen_list,
+                                    current_index as i32,
+                                    current_index as i32 - 1,
+                                );
                                 current_index -= 1;
                             }
                         }
                         KeyCode::Down => {
                             if current_index != current_list.len() - 1 {
-                                todos.swap(&chosen_list, current_index as i32, current_index as i32 + 1);
+                                todos.swap(
+                                    &chosen_list,
+                                    current_index as i32,
+                                    current_index as i32 + 1,
+                                );
                                 current_index += 1;
                             }
                         }
