@@ -94,24 +94,43 @@ fn input_loop(
 ) -> Result<()> {
     let mut chosen_list: TodoType = TodoType::InProgress;
     let mut current_index: usize = 0;
+    let mut editing: bool = false;
 
-    let selected_style = Style {
+    let title_selected = Style {
         fg: Some(Color::Cyan),
         bg: Some(Color::Black),
         ..Default::default()
     };
 
-    let default_style = Style {
+    let title_default = Style {
+        fg: Some(Color::White),
+        bg: Some(Color::Black),
+        ..Default::default()
+    };
+    
+    let task_default = Style {
         fg: Some(Color::White),
         bg: Some(Color::Black),
         ..Default::default()
     };
 
+    let task_selected = Style {
+        fg: Some(Color::White),F
+        bg: Some(Color::DarkGray),
+        ..Default::default()
+    };
+
+    let task_editing = Style {
+        fg: Some(Color::White),
+        bg: Some(Color::Green),
+        ..Default::default()
+    };
+
     loop {
-        let current_list: &Vec<String> = match chosen_list {
-            Backlog => &todos.backlog,
-            InProgress => &todos.in_progress,
-            Done => &todos.done,
+        let current_list: &mut Vec<String> = match chosen_list {
+            Backlog => &mut todos.backlog,
+            InProgress => &mut todos.in_progress,
+            Done => &mut todos.done,
         };
 
         if current_list.len() > 0 && current_list.len() < current_index + 1 {
@@ -130,8 +149,8 @@ fn input_loop(
             frame.render_widget(
                 Paragraph::new("Backlog")
                     .style(match chosen_list {
-                        Backlog => selected_style,
-                        _ => default_style,
+                        Backlog => title_selected,
+                        _ => title_default,
                     })
                     .centered(),
                 Rect::new(0, 0, third_length, 1),
@@ -139,8 +158,8 @@ fn input_loop(
             frame.render_widget(
                 Paragraph::new("In Progress")
                     .style(match chosen_list {
-                        InProgress => selected_style,
-                        _ => default_style,
+                        InProgress => title_selected,
+                        _ => title_default,
                     })
                     .centered(),
                 Rect::new(third_length, 0, third_length, 1),
@@ -148,8 +167,8 @@ fn input_loop(
             frame.render_widget(
                 Paragraph::new("Done")
                     .style(match chosen_list {
-                        Done => selected_style,
-                        _ => default_style,
+                        Done => title_selected,
+                        _ => title_default,
                     })
                     .centered(),
                 Rect::new(third_length * 2, 0, third_length, 1),
@@ -158,9 +177,9 @@ fn input_loop(
             // Render tasks
             for (i, item) in current_list.iter().enumerate() {
                 if i == current_index {
-                    paragraphs.push(Paragraph::new(item.clone()).white().on_dark_gray());
+                    paragraphs.push(Paragraph::new(item.clone()).style(if editing {task_editing} else {task_selected}));
                 } else {
-                    paragraphs.push(Paragraph::new(item.clone()).white().on_black());
+                    paragraphs.push(Paragraph::new(item.clone()).style(task_default));
                 }
             }
 
@@ -215,9 +234,22 @@ fn input_loop(
                 } else {
                     // Move cursor
                     match key.code {
-                        KeyCode::Char('q') => {
-                            break;
+                        KeyCode::Char(key_char) => {
+                            if editing {
+                                current_list[current_index].push(key_char);
+                            } else {
+                                match key_char {
+                                    'q' => break,
+                                    _ => (),
+                                }
+                            }
                         }
+                        KeyCode::Backspace => {
+                            if editing {
+                                current_list[current_index].pop();
+                            }
+                        }
+                        KeyCode::Enter => editing = !editing,
                         KeyCode::Up => {
                             if current_index > 0 {
                                 current_index -= 1;
