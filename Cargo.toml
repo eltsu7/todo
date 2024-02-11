@@ -1,5 +1,5 @@
 [package]
-name = "todo"
+name = "eltsu7-todo"
 description = "Simple TODO app to keep track of tasks."
 authors = ["Eeli Hernesniemi"]
 version = "0.1.0"
