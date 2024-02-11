@@ -244,7 +244,7 @@ fn input_loop(
                 }
                 // Move task
                 if key.modifiers.contains(KeyModifiers::ALT) {
-                    if current_list.len() == 0 {
+                    if current_list.len() == 0 || editing {
                         continue;
                     }
                     match key.code {
@@ -269,8 +269,8 @@ fn input_loop(
                         _ => (),
                     }
                 } else {
+                    
                     // Move cursor
-
                     if !editing {
                         match key.code {
                             KeyCode::Up => {
