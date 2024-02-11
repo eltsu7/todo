@@ -5,46 +5,92 @@ use crossterm::{
 };
 use ratatui::{
     layout::Rect,
-    prelude::{CrosstermBackend, Stylize, Terminal},
+    prelude::{CrosstermBackend, Terminal},
     style::{Color, Style},
     widgets::Paragraph,
 };
-use std::{
-    cmp,
-    io::{stdout, Result},
-};
+use std::{error::Error, fs::create_dir_all, io::{stdout, Result, Write}, path::PathBuf};
+use std::io::{BufReader, BufWriter};
+use std::fs::File;
+use std::path::Path;
+use home::{self, home_dir};
+
 use TodoType::{Backlog, Done, InProgress};
+use serde_json::{self, json, Value};
+use serde::{Serialize, Deserialize};
 
 enum TodoType {
     Backlog,
     InProgress,
     Done,
 }
-
-struct Todos {
+#[derive(Serialize, Deserialize)]
+struct Tasks {
     backlog: Vec<String>,
     in_progress: Vec<String>,
     done: Vec<String>,
 }
 
+struct Todos {
+    tasks: Tasks,
+}
+
 impl Todos {
     fn new() -> Todos {
         Todos {
-            backlog: Vec::new(),
-            in_progress: Vec::new(),
-            done: Vec::new(),
+            tasks: Tasks{
+                backlog: Vec::new(),
+                in_progress: Vec::new(),
+                done: Vec::new(),
+            }
         }
+    }
+
+    fn save_to_file(&self) -> std::io::Result<()> {
+        let json: serde_json::Value = json!({
+            "backlog": &self.tasks.backlog,
+            "in_progress": &self.tasks.in_progress,
+            "done": &self.tasks.done,
+        });
+        if let Some(mut file_path) = home_dir() {
+            file_path.push(".todo");
+            create_dir_all(file_path.clone())?;
+            file_path.push("tasks.json");
+
+            let tasks_file = File::create(file_path)?;
+            
+            let writer = BufWriter::new(tasks_file);
+            serde_json::to_writer_pretty(writer, &json)?;
+        }
+        Ok(())
+    }
+
+    fn load_file(&mut self) -> std::io::Result<()> {
+        if let Some(mut file_path) = home_dir() {
+            file_path.push(".todo");
+            file_path.push("tasks.json");
+            let tasks_file = File::open(file_path)?;
+            let reader = BufReader::new(tasks_file);
+            let tasks_json: Tasks = serde_json::from_reader(reader)?;
+            self.tasks = tasks_json;
+        }
+        Ok(())
     }
 
     fn add_todo(&mut self, new_item: &str, todo_type: TodoType) {
         match todo_type {
-            TodoType::Backlog => self.backlog.push(new_item.to_string()),
-            TodoType::InProgress => self.in_progress.push(new_item.to_string()),
-            TodoType::Done => self.done.push(new_item.to_string()),
+            TodoType::Backlog => self.tasks.backlog.push(new_item.to_string()),
+            TodoType::InProgress => self.tasks.in_progress.push(new_item.to_string()),
+            TodoType::Done => self.tasks.done.push(new_item.to_string()),
         }
     }
 
-    fn print_todos(&self) {
+    fn delete_task(&mut self, todo_type: &TodoType, index: usize) {
+        self.get_list(todo_type).remove(index);
+        self.save_to_file();
+    }
+
+    fn _print_todos(&self) {
         fn print_list(list: &Vec<String>) {
             for (i, text) in list.iter().enumerate() {
                 println!("  {}: {}", i, text)
@@ -52,42 +98,45 @@ impl Todos {
         }
 
         println!("Backlog:");
-        print_list(&self.backlog);
+        print_list(&self.tasks.backlog);
 
         println!("In Progress:");
-        print_list(&self.in_progress);
+        print_list(&self.tasks.in_progress);
 
         println!("Done:");
-        print_list(&self.done);
+        print_list(&self.tasks.done);
 
         println!();
     }
 
-    fn swap(&mut self, todo_type: &TodoType, i: i32, j: i32) {
-        let list: &mut Vec<String> = match todo_type {
-            TodoType::Backlog => &mut self.backlog,
-            TodoType::InProgress => &mut self.in_progress,
-            TodoType::Done => &mut self.done,
-        };
-
-        list.swap(i as usize, j as usize);
+    fn get_list(&mut self, todo_type: &TodoType) -> &mut Vec<String> {
+        match todo_type {
+            Backlog => &mut self.tasks.backlog,
+            InProgress => &mut self.tasks.in_progress,
+            Done => &mut self.tasks.done,
+        }
     }
 
-    fn move_to(&mut self, from_type: TodoType, to_type: TodoType, index: usize) {
-        let from_list: &mut Vec<String> = match from_type {
-            TodoType::Backlog => &mut self.backlog,
-            TodoType::InProgress => &mut self.in_progress,
-            TodoType::Done => &mut self.done,
-        };
-        let item: String = from_list.remove(index);
+    fn swap(&mut self, todo_type: &TodoType, i: usize, j: usize) {
+        self.get_list(todo_type).swap(i as usize, j as usize);
+    }
 
-        let to_list: &mut Vec<String> = match to_type {
-            TodoType::Backlog => &mut self.backlog,
-            TodoType::InProgress => &mut self.in_progress,
-            TodoType::Done => &mut self.done,
+    fn move_task(&mut self, todo_type: &TodoType, index: usize, right: bool) {
+        let destination = if right {
+            match todo_type {
+                Backlog => InProgress,
+                InProgress => Done,
+                Done => return,
+            }
+        } else {
+            match todo_type {
+                Backlog => return,
+                InProgress => Backlog,
+                Done => InProgress,
+            }
         };
-
-        to_list.push(item);
+        let item = self.get_list(todo_type).remove(index);
+        self.get_list(&destination).push(item);
     }
 }
 
@@ -99,14 +148,14 @@ fn input_loop(
     let mut current_index: usize = 0;
     let mut editing: bool = false;
 
-    let title_selected = Style {
-        fg: Some(Color::Cyan),
+    let title_default = Style {
+        fg: Some(Color::White),
         bg: Some(Color::Black),
         ..Default::default()
     };
 
-    let title_default = Style {
-        fg: Some(Color::White),
+    let title_selected = Style {
+        fg: Some(Color::Cyan),
         bg: Some(Color::Black),
         ..Default::default()
     };
@@ -130,11 +179,7 @@ fn input_loop(
     };
 
     loop {
-        let current_list: &mut Vec<String> = match chosen_list {
-            Backlog => &mut todos.backlog,
-            InProgress => &mut todos.in_progress,
-            Done => &mut todos.done,
-        };
+        let current_list: &mut Vec<String> = todos.get_list(&chosen_list);
 
         if current_list.len() > 0 && current_list.len() < current_index + 1 {
             current_index = current_list.len() - 1;
@@ -206,35 +251,23 @@ fn input_loop(
                         continue;
                     }
                     match key.code {
-                        KeyCode::Right => match chosen_list {
-                            Backlog => todos.move_to(Backlog, InProgress, current_index),
-                            InProgress => todos.move_to(InProgress, Done, current_index),
-                            _ => (),
-                        },
-                        KeyCode::Left => match chosen_list {
-                            InProgress => todos.move_to(InProgress, Backlog, current_index),
-                            Done => todos.move_to(Done, InProgress, current_index),
-                            _ => (),
-                        },
+                        KeyCode::Right | KeyCode::Left => {
+                            todos.move_task(&chosen_list, current_index, key.code == KeyCode::Right)
+                        }
                         KeyCode::Up => {
                             if current_index != 0 {
-                                todos.swap(
-                                    &chosen_list,
-                                    current_index as i32,
-                                    current_index as i32 - 1,
-                                );
+                                todos.swap(&chosen_list, current_index, current_index - 1);
                                 current_index -= 1;
                             }
                         }
                         KeyCode::Down => {
                             if current_index != current_list.len() - 1 {
-                                todos.swap(
-                                    &chosen_list,
-                                    current_index as i32,
-                                    current_index as i32 + 1,
-                                );
+                                todos.swap(&chosen_list, current_index, current_index + 1);
                                 current_index += 1;
                             }
+                        }
+                        KeyCode::Char('d') => {
+                            todos.delete_task(&chosen_list, current_index);
                         }
                         _ => (),
                     }
@@ -271,6 +304,9 @@ fn input_loop(
                             if current_list[current_index] == "" {
                                 current_list.remove(current_index);
                             }
+                            if !editing {
+                                todos.save_to_file()?;
+                            }
                         }
                         KeyCode::Up => {
                             if current_index > 0 {
@@ -304,14 +340,7 @@ fn input_loop(
 fn main() -> Result<()> {
     let mut t: Todos = Todos::new();
 
-    t.add_todo("eka", Backlog);
-    t.add_todo("toka", Backlog);
-    t.add_todo("kolmas", Backlog);
-    t.add_todo("Eka taski", InProgress);
-    t.add_todo("Toka taski", InProgress);
-    t.add_todo("Kolmas", InProgress);
-    t.add_todo("Neljäs", InProgress);
-    t.add_todo("Valmis :D", Done);
+    t.load_file().unwrap();
 
     stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
