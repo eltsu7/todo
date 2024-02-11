@@ -269,7 +269,6 @@ fn input_loop(
                         _ => (),
                     }
                 } else {
-                    
                     // Move cursor
                     if !editing {
                         match key.code {
@@ -342,6 +341,20 @@ fn input_loop(
 }
 
 fn main() -> Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 {
+        match &args[1][..] {
+            "-h" | "--help" => {
+                println!("Arrows: move cursor, alt + arrows: move tasks, q: quit, i: insert task, alt + d: delete task.");
+                return Ok(());
+            }
+            _ => {
+                println!("-h / --help for help.");
+                return Ok(());
+            }
+        }
+    }
+
     let mut t: Todos = Todos::new();
 
     t.load_file().unwrap();
