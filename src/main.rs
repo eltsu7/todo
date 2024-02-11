@@ -302,7 +302,10 @@ fn input_loop(
                                 current_list[current_index].push(key_char);
                             } else {
                                 match key_char {
-                                    'q' => break,
+                                    'q' => {
+                                        todos.save_to_file()?;
+                                        break;
+                                    }
                                     'i' => {
                                         let insert_index = if current_list.len() > 0 {
                                             current_index + 1
