@@ -10,7 +10,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::Paragraph,
 };
-use std::fs::create_dir_all;
+use std::{fs::create_dir_all, path::PathBuf};
 use std::fs::File;
 use std::io::{stdout, Result};
 use std::io::{BufReader, BufWriter};
@@ -46,34 +46,30 @@ impl Todos {
         }
     }
 
-    fn save_to_file(&self) -> std::io::Result<()> {
-        let json: serde_json::Value = json!({
-            "backlog": &self.tasks.backlog,
-            "in_progress": &self.tasks.in_progress,
-            "done": &self.tasks.done,
-        });
-        if let Some(mut file_path) = home_dir() {
-            file_path.push(".todo");
-            create_dir_all(file_path.clone())?;
-            file_path.push("tasks.json");
+    fn get_file_path(&self) -> File{
+        let mut path = match home_dir() {
+            Some(path) => path,
+            None => panic!("Home dir not found")
+        };
 
-            let tasks_file = File::create(file_path)?;
-
-            let writer = BufWriter::new(tasks_file);
-            serde_json::to_writer_pretty(writer, &json)?;
+        path.push(".todo");
+        if !path.exists() {
+            create_dir_all(&path).unwrap();
         }
+        path.push("tasks.json");
+        File::create(&path).unwrap()
+    }
+
+    fn save_to_file(&self) -> std::io::Result<()> {
+        let writer = BufWriter::new(self.get_file_path());
+        serde_json::to_writer_pretty(writer, &self.tasks)?;
         Ok(())
     }
 
     fn load_file(&mut self) -> std::io::Result<()> {
-        if let Some(mut file_path) = home_dir() {
-            file_path.push(".todo");
-            file_path.push("tasks.json");
-            let tasks_file = File::open(file_path)?;
-            let reader = BufReader::new(tasks_file);
-            let tasks_json: Tasks = serde_json::from_reader(reader)?;
-            self.tasks = tasks_json;
-        }
+        let reader = BufReader::new(self.get_file_path());
+        let tasks_json: Tasks = serde_json::from_reader(reader)?;
+        self.tasks = tasks_json;
         Ok(())
     }
 
