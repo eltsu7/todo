@@ -328,6 +328,9 @@ fn input_loop(
                             }
                         }
                         KeyCode::Enter => {
+                            if current_list.len() == 0 {
+                                continue;
+                            }
                             editing = !editing;
                             if current_list[current_index] == "" {
                                 current_list.remove(current_index);
