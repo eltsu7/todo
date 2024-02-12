@@ -10,13 +10,13 @@ use ratatui::{
     style::{Color, Style},
     widgets::Paragraph,
 };
-use std::{fs::create_dir_all, io::Write, path::PathBuf};
+use std::{fs::create_dir_all, path::PathBuf};
 use std::fs::File;
 use std::io::{stdout, Result};
 use std::io::{BufReader, BufWriter};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{self, json};
+use serde_json::{self};
 use TodoType::{Backlog, Done, InProgress};
 
 enum TodoType {
