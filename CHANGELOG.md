@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1] 2024-02-12
+
+### Fixed
+
+- Crash when trying to edit with empty list.
+- Some file saving crashes.
+
 ## [0.1.0] 2024-02-11
 
 ### Added
