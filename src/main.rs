@@ -10,7 +10,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::Paragraph,
 };
-use std::{fs::create_dir_all, path::PathBuf};
+use std::{fs::create_dir_all, io::Write, path::PathBuf};
 use std::fs::File;
 use std::io::{stdout, Result};
 use std::io::{BufReader, BufWriter};
@@ -46,7 +46,7 @@ impl Todos {
         }
     }
 
-    fn get_file_path(&self) -> File{
+    fn get_file_path(&self) -> PathBuf{
         let mut path = match home_dir() {
             Some(path) => path,
             None => panic!("Home dir not found")
@@ -57,17 +57,23 @@ impl Todos {
             create_dir_all(&path).unwrap();
         }
         path.push("tasks.json");
-        File::create(&path).unwrap()
+        if !path.exists() {
+            let writer = BufWriter::new(File::create(&path).unwrap());    
+            serde_json::to_writer_pretty(writer, &self.tasks).unwrap();
+        }
+
+        path
     }
 
     fn save_to_file(&self) -> std::io::Result<()> {
-        let writer = BufWriter::new(self.get_file_path());
+
+        let writer = BufWriter::new(File::create(self.get_file_path())?);
         serde_json::to_writer_pretty(writer, &self.tasks)?;
         Ok(())
     }
 
     fn load_file(&mut self) -> std::io::Result<()> {
-        let reader = BufReader::new(self.get_file_path());
+        let reader = BufReader::new(File::open(self.get_file_path())?);
         let tasks_json: Tasks = serde_json::from_reader(reader)?;
         self.tasks = tasks_json;
         Ok(())
