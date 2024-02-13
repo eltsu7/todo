@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.2] 2024-02-12
+
+### Added
+
+- Show number of items in lists.
+
 ## [0.1.1] 2024-02-12
 
 ### Fixed

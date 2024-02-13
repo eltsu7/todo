@@ -10,10 +10,10 @@ use ratatui::{
     style::{Color, Style},
     widgets::Paragraph,
 };
-use std::{fs::create_dir_all, path::PathBuf};
 use std::fs::File;
 use std::io::{stdout, Result};
 use std::io::{BufReader, BufWriter};
+use std::{fs::create_dir_all, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{self};
@@ -46,10 +46,10 @@ impl Todos {
         }
     }
 
-    fn get_file_path(&self) -> PathBuf{
+    fn get_file_path(&self) -> PathBuf {
         let mut path = match home_dir() {
             Some(path) => path,
-            None => panic!("Home dir not found")
+            None => panic!("Home dir not found"),
         };
 
         path.push(".todo");
@@ -58,7 +58,7 @@ impl Todos {
         }
         path.push("tasks.json");
         if !path.exists() {
-            let writer = BufWriter::new(File::create(&path).unwrap());    
+            let writer = BufWriter::new(File::create(&path).unwrap());
             serde_json::to_writer_pretty(writer, &self.tasks).unwrap();
         }
 
@@ -66,7 +66,6 @@ impl Todos {
     }
 
     fn save_to_file(&self) -> std::io::Result<()> {
-
         let writer = BufWriter::new(File::create(self.get_file_path())?);
         serde_json::to_writer_pretty(writer, &self.tasks)?;
         Ok(())
@@ -178,6 +177,12 @@ fn input_loop(
     };
 
     loop {
+        let list_lengths: [usize; 3] = [
+            todos.tasks.backlog.len(),
+            todos.tasks.in_progress.len(),
+            todos.tasks.done.len(),
+        ];
+
         let current_list: &mut Vec<String> = todos.get_list(&chosen_list);
 
         if current_list.len() > 0 && current_list.len() < current_index + 1 {
@@ -194,7 +199,7 @@ fn input_loop(
 
             // Render titles
             frame.render_widget(
-                Paragraph::new("Backlog")
+                Paragraph::new(format!("Backlog ({})", list_lengths[0]))
                     .style(match chosen_list {
                         Backlog => title_selected,
                         _ => title_default,
@@ -203,7 +208,7 @@ fn input_loop(
                 Rect::new(0, 0, third_length, 1),
             );
             frame.render_widget(
-                Paragraph::new("In Progress")
+                Paragraph::new(format!("In Progress ({})", list_lengths[1]))
                     .style(match chosen_list {
                         InProgress => title_selected,
                         _ => title_default,
@@ -212,7 +217,7 @@ fn input_loop(
                 Rect::new(third_length, 0, third_length, 1),
             );
             frame.render_widget(
-                Paragraph::new("Done")
+                Paragraph::new(format!("Done ({})", list_lengths[2]))
                     .style(match chosen_list {
                         Done => title_selected,
                         _ => title_default,
