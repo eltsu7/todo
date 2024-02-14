@@ -198,33 +198,37 @@ fn input_loop(
             let third_length = frame.size().width / 3;
 
             // Render titles
-            frame.render_widget(
-                Paragraph::new(format!("Backlog ({})", list_lengths[0]))
-                    .style(match chosen_list {
-                        Backlog => title_selected,
-                        _ => title_default,
-                    })
-                    .centered(),
-                Rect::new(0, 0, third_length, 1),
-            );
-            frame.render_widget(
-                Paragraph::new(format!("In Progress ({})", list_lengths[1]))
-                    .style(match chosen_list {
-                        InProgress => title_selected,
-                        _ => title_default,
-                    })
-                    .centered(),
-                Rect::new(third_length, 0, third_length, 1),
-            );
-            frame.render_widget(
-                Paragraph::new(format!("Done ({})", list_lengths[2]))
-                    .style(match chosen_list {
-                        Done => title_selected,
-                        _ => title_default,
-                    })
-                    .centered(),
-                Rect::new(third_length * 2, 0, third_length, 1),
-            );
+            for (i, list_name) in vec!["Backlog", "In Progress", "Done"].iter().enumerate() {
+                let title = format!("{} ({})", list_name, list_lengths[i]);
+                let style = match chosen_list {
+                    Backlog => {
+                        if i == 0 {
+                            title_selected
+                        } else {
+                            title_default
+                        }
+                    }
+                    InProgress => {
+                        if i == 1 {
+                            title_selected
+                        } else {
+                            title_default
+                        }
+                    }
+                    Done => {
+                        if i == 2 {
+                            title_selected
+                        } else {
+                            title_default
+                        }
+                    }
+                };
+
+                frame.render_widget(
+                    Paragraph::new(title).style(style).centered(),
+                    Rect::new(third_length * i as u16, 0, third_length, 1),
+                )
+            }
 
             // Render tasks
             for (i, item) in current_list.iter().enumerate() {
