@@ -10,10 +10,11 @@ use ratatui::{
     style::{Color, Style},
     widgets::Paragraph,
 };
-use std::fs::File;
 use std::io::{stdout, Result};
-use std::io::{BufReader, BufWriter};
-use std::{fs::create_dir_all, path::PathBuf};
+use std::{
+    fs::{self, create_dir_all},
+    path::PathBuf,
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{self};
@@ -58,23 +59,22 @@ impl Todos {
         }
         path.push("tasks.json");
         if !path.exists() {
-            let writer = BufWriter::new(File::create(&path).unwrap());
-            serde_json::to_writer_pretty(writer, &self.tasks).unwrap();
+            fs::write(&path, serde_json::to_string_pretty(&self.tasks).unwrap()).unwrap();
         }
 
         path
     }
 
     fn save_to_file(&self) -> std::io::Result<()> {
-        let writer = BufWriter::new(File::create(self.get_file_path())?);
-        serde_json::to_writer_pretty(writer, &self.tasks)?;
+        fs::write(
+            self.get_file_path(),
+            serde_json::to_string_pretty(&self.tasks)?,
+        )?;
         Ok(())
     }
 
     fn load_file(&mut self) -> std::io::Result<()> {
-        let reader = BufReader::new(File::open(self.get_file_path())?);
-        let tasks_json: Tasks = serde_json::from_reader(reader)?;
-        self.tasks = tasks_json;
+        self.tasks = serde_json::from_str(&fs::read_to_string(self.get_file_path())?)?;
         Ok(())
     }
 
