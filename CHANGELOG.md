@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.4] 2024-02-12
+
+### Fixed
+
+- Cursor position bugs when moving tasks.
+
 ## [0.1.3] 2024-02-12
 
 ### Changed
