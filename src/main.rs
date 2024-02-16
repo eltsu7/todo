@@ -112,6 +112,15 @@ impl Todos {
         self.get_list(self.current_list)
     }
 
+    fn _check_cursor_position(&mut self) {
+        if self.lists[self.current_list].tasks.len() == 0 {
+            self.current_task = 0;
+        }
+        if self.current_task + 1 > self.lists[self.current_list].tasks.len() {
+            self.current_task = self.lists[self.current_list].tasks.len()
+        }
+    }
+
     fn move_cursor(&mut self, direction: Direction) {
         match direction {
             Left => {
@@ -135,6 +144,7 @@ impl Todos {
                 }
             }
         }
+        self._check_cursor_position();
     }
 
     fn move_task(&mut self, direction: Direction) {
@@ -167,6 +177,7 @@ impl Todos {
                 }
             }
         }
+        self._check_cursor_position();
     }
 }
 
