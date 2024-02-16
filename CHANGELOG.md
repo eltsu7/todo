@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.3] 2024-02-12
+
+### Changed
+
+- Ability to change number of lists and their names (from source code).
+
 ## [0.1.2] 2024-02-12
 
 ### Added

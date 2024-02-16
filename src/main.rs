@@ -371,6 +371,8 @@ fn main() -> Result<()> {
         tasks: Vec::new(),
     });
 
+    t.current_list = 1;
+
     t.load_file().unwrap();
 
     stdout().execute(EnterAlternateScreen)?;
