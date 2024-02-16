@@ -18,32 +18,36 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use serde_json::{self};
-use TodoType::{Backlog, Done, InProgress};
+use Direction::*;
 
-enum TodoType {
-    Backlog,
-    InProgress,
-    Done,
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
 }
+
 #[derive(Serialize, Deserialize)]
-struct Tasks {
-    backlog: Vec<String>,
-    in_progress: Vec<String>,
-    done: Vec<String>,
+struct TaskList {
+    name: String,
+    tasks: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize)]
 struct Todos {
-    tasks: Tasks,
+    lists: Vec<TaskList>,
+    current_list: usize,
+    current_task: usize,
+    editing: bool,
 }
 
 impl Todos {
     fn new() -> Todos {
         Todos {
-            tasks: Tasks {
-                backlog: Vec::new(),
-                in_progress: Vec::new(),
-                done: Vec::new(),
-            },
+            lists: Vec::new(),
+            current_list: 0,
+            current_task: 0,
+            editing: false,
         }
     }
 
@@ -59,7 +63,7 @@ impl Todos {
         }
         path.push("tasks.json");
         if !path.exists() {
-            fs::write(&path, serde_json::to_string_pretty(&self.tasks).unwrap()).unwrap();
+            fs::write(&path, serde_json::to_string_pretty(&self.lists).unwrap()).unwrap();
         }
 
         path
@@ -68,73 +72,101 @@ impl Todos {
     fn save_to_file(&self) -> std::io::Result<()> {
         fs::write(
             self.get_file_path(),
-            serde_json::to_string_pretty(&self.tasks)?,
+            serde_json::to_string_pretty(&self.lists)?,
         )?;
         Ok(())
     }
 
     fn load_file(&mut self) -> std::io::Result<()> {
-        self.tasks = serde_json::from_str(&fs::read_to_string(self.get_file_path())?)?;
+        self.lists = serde_json::from_str(&fs::read_to_string(self.get_file_path())?)?;
         Ok(())
     }
 
-    fn add_task(&mut self, todo_type: &TodoType, index: usize) {
-        self.get_list(&todo_type).insert(index, String::new());
+    fn add_task(&mut self) {
+        let task_index = self.current_task.clone();
+        let list = self.get_current_list();
+
+        if list.tasks.len() == 0 {
+            list.tasks.push(String::new());
+        } else {
+            list.tasks.insert(task_index, String::new())
+        }
     }
 
-    fn delete_task(&mut self, todo_type: &TodoType, index: usize) -> std::io::Result<()> {
-        self.get_list(todo_type).remove(index);
+    fn delete_task(&mut self) -> std::io::Result<()> {
+        let task_index = self.current_task.clone();
+        self.get_current_list().tasks.remove(task_index);
+        let list = self.get_current_list();
+        if list.tasks.len() > 0 && task_index + 1 > list.tasks.len() {
+            self.current_task = list.tasks.len() - 1;
+        }
         self.save_to_file()?;
         Ok(())
     }
 
-    fn _print_todos(&self) {
-        fn print_list(list: &Vec<String>) {
-            for (i, text) in list.iter().enumerate() {
-                println!("  {}: {}", i, text)
+    fn get_list(&mut self, list_index: usize) -> &mut TaskList {
+        self.lists.get_mut(list_index).expect("Lists out of range!")
+    }
+
+    fn get_current_list(&mut self) -> &mut TaskList {
+        self.get_list(self.current_list)
+    }
+
+    fn move_cursor(&mut self, direction: Direction) {
+        match direction {
+            Left => {
+                if self.current_list != 0 {
+                    self.current_list -= 1;
+                }
+            }
+            Right => {
+                if self.current_list + 1 < self.lists.len() {
+                    self.current_list += 1;
+                }
+            }
+            Up => {
+                if self.current_task != 0 {
+                    self.current_task -= 1;
+                }
+            }
+            Down => {
+                if self.current_task + 1 < self.get_current_list().tasks.len() {
+                    self.current_task += 1;
+                }
             }
         }
-
-        println!("Backlog:");
-        print_list(&self.tasks.backlog);
-
-        println!("In Progress:");
-        print_list(&self.tasks.in_progress);
-
-        println!("Done:");
-        print_list(&self.tasks.done);
-
-        println!();
     }
 
-    fn get_list(&mut self, todo_type: &TodoType) -> &mut Vec<String> {
-        match todo_type {
-            Backlog => &mut self.tasks.backlog,
-            InProgress => &mut self.tasks.in_progress,
-            Done => &mut self.tasks.done,
+    fn move_task(&mut self, direction: Direction) {
+        let task_index = self.current_task.clone();
+        match direction {
+            Up => {
+                if self.current_task != 0 {
+                    self.get_current_list()
+                        .tasks
+                        .swap(task_index, task_index - 1);
+                }
+            }
+            Down => {
+                if self.get_current_list().tasks.len() > task_index + 1 {
+                    self.get_current_list()
+                        .tasks
+                        .swap(task_index, task_index + 1);
+                }
+            }
+            Left => {
+                if self.current_list != 0 {
+                    let item = self.get_current_list().tasks.remove(task_index);
+                    self.get_list(self.current_list - 1).tasks.push(item);
+                }
+            }
+            Right => {
+                if self.lists.len() > self.current_list + 1 {
+                    let item = self.get_current_list().tasks.remove(task_index);
+                    self.get_list(self.current_list + 1).tasks.push(item);
+                }
+            }
         }
-    }
-
-    fn swap(&mut self, todo_type: &TodoType, i: usize, j: usize) {
-        self.get_list(todo_type).swap(i as usize, j as usize);
-    }
-
-    fn move_task(&mut self, todo_type: &TodoType, index: usize, right: bool) {
-        let destination = if right {
-            match todo_type {
-                Backlog => InProgress,
-                InProgress => Done,
-                Done => return,
-            }
-        } else {
-            match todo_type {
-                Backlog => return,
-                InProgress => Backlog,
-                Done => InProgress,
-            }
-        };
-        let item = self.get_list(todo_type).remove(index);
-        self.get_list(&destination).push(item);
     }
 }
 
@@ -142,10 +174,6 @@ fn input_loop(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     todos: &mut Todos,
 ) -> Result<()> {
-    let mut chosen_list: TodoType = TodoType::InProgress;
-    let mut current_index: usize = 0;
-    let mut editing: bool = false;
-
     let title_default = Style {
         fg: Some(Color::White),
         bg: Some(Color::Black),
@@ -177,74 +205,43 @@ fn input_loop(
     };
 
     loop {
-        let list_lengths: [usize; 3] = [
-            todos.tasks.backlog.len(),
-            todos.tasks.in_progress.len(),
-            todos.tasks.done.len(),
-        ];
-
-        let current_list: &mut Vec<String> = todos.get_list(&chosen_list);
-
-        if current_list.len() > 0 && current_list.len() < current_index + 1 {
-            current_index = current_list.len() - 1;
-        }
-
+        // Drawing
         terminal.draw(|frame| {
-            let mut area = frame.size();
-            area.height = area.height / 2;
-
-            let mut paragraphs: Vec<Paragraph<'_>> = Vec::<Paragraph>::new();
-
-            let third_length = frame.size().width / 3;
-
             // Render titles
-            for (i, list_name) in vec!["Backlog", "In Progress", "Done"].iter().enumerate() {
-                let title = format!("{} ({})", list_name, list_lengths[i]);
-                let style = match chosen_list {
-                    Backlog => {
-                        if i == 0 {
-                            title_selected
-                        } else {
-                            title_default
-                        }
-                    }
-                    InProgress => {
-                        if i == 1 {
-                            title_selected
-                        } else {
-                            title_default
-                        }
-                    }
-                    Done => {
-                        if i == 2 {
-                            title_selected
-                        } else {
-                            title_default
-                        }
-                    }
+
+            let title_length = frame.size().width / todos.lists.len() as u16;
+            for (i, list) in todos.lists.iter_mut().enumerate() {
+                let style = if i == todos.current_list {
+                    title_selected
+                } else {
+                    title_default
                 };
 
+                let title_text = format!("{} ({})", list.name, list.tasks.len());
                 frame.render_widget(
-                    Paragraph::new(title).style(style).centered(),
-                    Rect::new(third_length * i as u16, 0, third_length, 1),
+                    Paragraph::new(title_text).style(style).centered(),
+                    Rect::new(title_length * i as u16, 0, title_length, 1),
                 )
             }
 
+            let task_index = todos.current_task.clone();
+            let editing = todos.editing.clone();
             // Render tasks
-            for (i, item) in current_list.iter().enumerate() {
-                if i == current_index {
-                    paragraphs.push(Paragraph::new(item.clone()).style(if editing {
+            for (i, task_text) in todos.get_list(todos.current_list).tasks.iter().enumerate() {
+                let style = if task_index == i {
+                    if editing {
                         task_editing
                     } else {
                         task_selected
-                    }));
+                    }
                 } else {
-                    paragraphs.push(Paragraph::new(item.clone()).style(task_default));
-                }
-            }
+                    task_default
+                };
 
-            for (i, item) in paragraphs.iter().enumerate() {
-                frame.render_widget(item, Rect::new(0, 1 + i as u16, frame.size().width, 1));
+                frame.render_widget(
+                    Paragraph::new(task_text.clone()).style(style),
+                    Rect::new(0, 1 + i as u16, frame.size().width, 1),
+                );
             }
         })?;
 
@@ -253,64 +250,55 @@ fn input_loop(
                 if key.kind != KeyEventKind::Press {
                     continue;
                 }
+
                 // Move task
                 if key.modifiers.contains(KeyModifiers::ALT) {
-                    if current_list.len() == 0 || editing {
+                    if todos.get_current_list().tasks.len() == 0 || todos.editing {
                         continue;
                     }
                     match key.code {
-                        KeyCode::Right | KeyCode::Left => {
-                            todos.move_task(&chosen_list, current_index, key.code == KeyCode::Right)
+                        KeyCode::Right => {
+                            todos.move_task(Right);
+                        }
+                        KeyCode::Left => {
+                            todos.move_task(Left);
                         }
                         KeyCode::Up => {
-                            if current_index != 0 {
-                                todos.swap(&chosen_list, current_index, current_index - 1);
-                                current_index -= 1;
-                            }
+                            todos.move_task(Up);
                         }
                         KeyCode::Down => {
-                            if current_index != current_list.len() - 1 {
-                                todos.swap(&chosen_list, current_index, current_index + 1);
-                                current_index += 1;
-                            }
+                            todos.move_task(Down);
                         }
                         KeyCode::Char('d') => {
-                            todos.delete_task(&chosen_list, current_index)?;
+                            todos.delete_task()?;
                         }
                         _ => (),
                     }
                 } else {
                     // Move cursor
-                    if !editing {
+                    if !todos.editing {
                         match key.code {
                             KeyCode::Up => {
-                                if current_index > 0 {
-                                    current_index -= 1;
-                                }
+                                todos.move_cursor(Up);
                             }
                             KeyCode::Down => {
-                                if current_index + 1 < current_list.len() {
-                                    current_index += 1;
-                                }
+                                todos.move_cursor(Down);
                             }
-                            KeyCode::Left => match chosen_list {
-                                InProgress => chosen_list = Backlog,
-                                Done => chosen_list = InProgress,
-                                _ => (),
-                            },
-                            KeyCode::Right => match chosen_list {
-                                InProgress => chosen_list = Done,
-                                Backlog => chosen_list = InProgress,
-                                _ => (),
-                            },
+                            KeyCode::Left => {
+                                todos.move_cursor(Left);
+                            }
+                            KeyCode::Right => {
+                                todos.move_cursor(Right);
+                            }
                             _ => (),
                         }
                     }
 
                     match key.code {
                         KeyCode::Char(key_char) => {
-                            if editing {
-                                current_list[current_index].push(key_char);
+                            if todos.editing {
+                                let task_index = todos.current_task.clone();
+                                todos.get_current_list().tasks[task_index].push(key_char);
                             } else {
                                 match key_char {
                                     'q' => {
@@ -318,33 +306,29 @@ fn input_loop(
                                         break;
                                     }
                                     'i' => {
-                                        let insert_index = if current_list.len() > 0 {
-                                            current_index + 1
-                                        } else {
-                                            current_index
-                                        };
-                                        todos.add_task(&chosen_list, insert_index);
-                                        current_index += 1;
-                                        editing = true;
+                                        todos.add_task();
+                                        todos.editing = true;
                                     }
                                     _ => (),
                                 }
                             }
                         }
                         KeyCode::Backspace => {
-                            if editing {
-                                current_list[current_index].pop();
+                            if todos.editing {
+                                let task_index = todos.current_task.clone();
+                                todos.get_current_list().tasks[task_index].pop();
                             }
                         }
                         KeyCode::Enter => {
-                            if current_list.len() == 0 {
+                            let task_index = todos.current_task.clone();
+                            if todos.get_current_list().tasks.len() == 0 {
                                 continue;
                             }
-                            editing = !editing;
-                            if current_list[current_index] == "" {
-                                current_list.remove(current_index);
+                            todos.editing = !todos.editing;
+                            if todos.get_current_list().tasks[task_index] == "" {
+                                todos.get_current_list().tasks.remove(task_index);
                             }
-                            if !editing {
+                            if !todos.editing {
                                 todos.save_to_file()?;
                             }
                         }
@@ -373,6 +357,19 @@ fn main() -> Result<()> {
     }
 
     let mut t: Todos = Todos::new();
+
+    t.lists.push(TaskList {
+        name: "Backlog".to_string(),
+        tasks: Vec::new(),
+    });
+    t.lists.push(TaskList {
+        name: "In Progress".to_string(),
+        tasks: Vec::new(),
+    });
+    t.lists.push(TaskList {
+        name: "Done".to_string(),
+        tasks: Vec::new(),
+    });
 
     t.load_file().unwrap();
 
