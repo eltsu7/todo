@@ -156,6 +156,7 @@ impl Todos {
                         .tasks
                         .swap(task_index, task_index - 1);
                 }
+                self.current_task -= 1;
             }
             Down => {
                 if self.get_current_list().tasks.len() > task_index + 1 {
@@ -163,6 +164,7 @@ impl Todos {
                         .tasks
                         .swap(task_index, task_index + 1);
                 }
+                self.current_task += 1;
             }
             Left => {
                 if self.current_list != 0 {
