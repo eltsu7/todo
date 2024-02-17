@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.5] 2024-02-17
+
+### Added
+
+- Fancy titles.
+
+### Fixed
+
+- Cursor position out of range when moving between lists.
+
 ## [0.1.4] 2024-02-12
 
 ### Fixed

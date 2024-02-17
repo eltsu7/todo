@@ -5,10 +5,10 @@ use crossterm::{
 };
 use home::{self, home_dir};
 use ratatui::{
-    layout::Rect,
+    layout::{self, Constraint, Layout},
     prelude::{CrosstermBackend, Terminal},
     style::{Color, Style},
-    widgets::Paragraph,
+    widgets::{Borders, Paragraph},
 };
 use std::io::{stdout, Result};
 use std::{
@@ -117,7 +117,7 @@ impl Todos {
             self.current_task = 0;
         }
         if self.current_task + 1 > self.lists[self.current_list].tasks.len() {
-            self.current_task = self.lists[self.current_list].tasks.len()
+            self.current_task = self.lists[self.current_list].tasks.len() - 1;
         }
     }
 
@@ -220,9 +220,22 @@ fn input_loop(
     loop {
         // Drawing
         terminal.draw(|frame| {
-            // Render titles
+            let outer_layout = Layout::default()
+                .direction(layout::Direction::Vertical)
+                .constraints(vec![Constraint::Length(3), Constraint::Fill(1)])
+                .split(frame.size());
 
-            let title_length = frame.size().width / todos.lists.len() as u16;
+            // Render titles
+            let mut title_constraints = Vec::new();
+            for _ in 0..todos.lists.len() {
+                title_constraints.push(Constraint::Fill(1));
+            }
+
+            let title_layout = Layout::default()
+                .direction(layout::Direction::Horizontal)
+                .constraints(title_constraints)
+                .split(outer_layout[0]);
+
             for (i, list) in todos.lists.iter_mut().enumerate() {
                 let style = if i == todos.current_list {
                     title_selected
@@ -232,14 +245,27 @@ fn input_loop(
 
                 let title_text = format!("{} ({})", list.name, list.tasks.len());
                 frame.render_widget(
-                    Paragraph::new(title_text).style(style).centered(),
-                    Rect::new(title_length * i as u16, 0, title_length, 1),
+                    Paragraph::new(title_text)
+                        .style(style)
+                        .centered()
+                        .block(ratatui::widgets::Block::new().borders(Borders::ALL)),
+                    title_layout[i],
                 )
             }
 
+            // Render tasks
+            let mut task_constraints = Vec::new();
+            for _ in 0..todos.get_current_list().tasks.len() {
+                task_constraints.push(Constraint::Length(1));
+            }
+
+            let task_layout = Layout::default()
+                .direction(layout::Direction::Vertical)
+                .constraints(task_constraints)
+                .split(outer_layout[1]);
+
             let task_index = todos.current_task.clone();
             let editing = todos.editing.clone();
-            // Render tasks
             for (i, task_text) in todos.get_list(todos.current_list).tasks.iter().enumerate() {
                 let style = if task_index == i {
                     if editing {
@@ -253,7 +279,7 @@ fn input_loop(
 
                 frame.render_widget(
                     Paragraph::new(task_text.clone()).style(style),
-                    Rect::new(0, 1 + i as u16, frame.size().width, 1),
+                    task_layout[i],
                 );
             }
         })?;
