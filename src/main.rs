@@ -115,8 +115,7 @@ impl Todos {
     fn _check_cursor_position(&mut self) {
         if self.lists[self.current_list].tasks.len() == 0 {
             self.current_task = 0;
-        }
-        if self.current_task + 1 > self.lists[self.current_list].tasks.len() {
+        } else if self.current_task + 1 > self.lists[self.current_list].tasks.len() {
             self.current_task = self.lists[self.current_list].tasks.len() - 1;
         }
     }

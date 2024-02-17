@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.6] 2024-02-17
+
+- Fix another cursor position bug.
+
 ## [0.1.5] 2024-02-17
 
 ### Added
