@@ -1,6 +1,14 @@
 # Changelog
 
+## [0.1.7] 2024-03-05
+
+### Added
+
+- Add default chosen list.
+
 ## [0.1.6] 2024-02-17
+
+### Fixed
 
 - Fix another cursor position bug.
 

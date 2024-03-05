@@ -28,14 +28,21 @@ enum Direction {
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Clone)]
 struct TaskList {
     name: String,
     tasks: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
+struct Tasks {
+    default: usize,
+    lists: Vec<TaskList>,
+}
+
 struct Todos {
     lists: Vec<TaskList>,
+    default_list: usize,
     current_list: usize,
     current_task: usize,
     editing: bool,
@@ -45,6 +52,7 @@ impl Todos {
     fn new() -> Todos {
         Todos {
             lists: Vec::new(),
+            default_list: 0,
             current_list: 0,
             current_task: 0,
             editing: false,
@@ -63,22 +71,37 @@ impl Todos {
         }
         path.push("tasks.json");
         if !path.exists() {
-            fs::write(&path, serde_json::to_string_pretty(&self.lists).unwrap()).unwrap();
+            let default_tasks: Tasks = Tasks {
+                default: 0,
+                lists: vec![
+                    TaskList{name: "Todo".to_string(), tasks: Vec::new()},
+                    TaskList{name: "Done".to_string(), tasks: Vec::new()},
+                ]
+            };
+            fs::write(&path, serde_json::to_string_pretty(&default_tasks).unwrap()).unwrap();
         }
 
         path
     }
 
     fn save_to_file(&self) -> std::io::Result<()> {
+        let tasks = Tasks{
+            default: self.default_list,
+            lists: self.lists.clone(),
+        };
         fs::write(
             self.get_file_path(),
-            serde_json::to_string_pretty(&self.lists)?,
+            serde_json::to_string_pretty(&tasks)?,
         )?;
+
         Ok(())
     }
 
     fn load_file(&mut self) -> std::io::Result<()> {
-        self.lists = serde_json::from_str(&fs::read_to_string(self.get_file_path())?)?;
+        let tasks: Tasks = serde_json::from_str(&fs::read_to_string(self.get_file_path())?)?;
+        self.lists = tasks.lists;
+        self.default_list = tasks.default;
+        self.current_list = self.default_list;
         Ok(())
     }
 
@@ -395,21 +418,6 @@ fn main() -> Result<()> {
     }
 
     let mut t: Todos = Todos::new();
-
-    t.lists.push(TaskList {
-        name: "Backlog".to_string(),
-        tasks: Vec::new(),
-    });
-    t.lists.push(TaskList {
-        name: "In Progress".to_string(),
-        tasks: Vec::new(),
-    });
-    t.lists.push(TaskList {
-        name: "Done".to_string(),
-        tasks: Vec::new(),
-    });
-
-    t.current_list = 1;
 
     t.load_file().unwrap();
 
